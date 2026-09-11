@@ -81,26 +81,32 @@ async def test_download_podcast_lifecycle(tmp_path: Path) -> None:
     resp_conflict = client.get(f"/api/v1/podcasts/{job.id}/download", headers=AUTH_HEADER)
     assert resp_conflict.status_code == 409
 
-    # 2. Conclui a tarefa e gera um arquivo de áudio de teste
-    audio_file = tmp_path / f"{job.id}.m4a"
+    # 2. Conclui a tarefa e gera um arquivo de áudio de teste no diretório permitido
+    audios_dir = settings.storage_dir / "audios"
+    audios_dir.mkdir(parents=True, exist_ok=True)
+    audio_file = audios_dir / f"{job.id}.m4a"
     audio_file.write_bytes(b"dummy audio content")
 
-    await job_manager.update_job_status(
-        job_id=job.id,
-        status=JobStatus.COMPLETED,
-        message="Concluído com sucesso.",
-        audio_file_path=str(audio_file),
-        audio_file_name=f"{job.id}.m4a",
-        audio_size_bytes=len(b"dummy audio content"),
-    )
+    try:
+        await job_manager.update_job_status(
+            job_id=job.id,
+            status=JobStatus.COMPLETED,
+            message="Concluído com sucesso.",
+            audio_file_path=str(audio_file),
+            audio_file_name=f"{job.id}.m4a",
+            audio_size_bytes=len(b"dummy audio content"),
+        )
 
-    # 3. Consulta o status da tarefa concluída
-    resp_status = client.get(f"/api/v1/podcasts/{job.id}", headers=AUTH_HEADER)
-    assert resp_status.status_code == 200
-    assert resp_status.json()["status"] == "completed"
-    assert resp_status.json()["download_url"] is not None
+        # 3. Consulta o status da tarefa concluída
+        resp_status = client.get(f"/api/v1/podcasts/{job.id}", headers=AUTH_HEADER)
+        assert resp_status.status_code == 200
+        assert resp_status.json()["status"] == "completed"
+        assert resp_status.json()["download_url"] is not None
 
-    # 4. Faz o download com sucesso
-    resp_download = client.get(f"/api/v1/podcasts/{job.id}/download", headers=AUTH_HEADER)
-    assert resp_download.status_code == 200
-    assert resp_download.content == b"dummy audio content"
+        # 4. Faz o download com sucesso
+        resp_download = client.get(f"/api/v1/podcasts/{job.id}/download", headers=AUTH_HEADER)
+        assert resp_download.status_code == 200
+        assert resp_download.content == b"dummy audio content"
+    finally:
+        if audio_file.exists():
+            audio_file.unlink()

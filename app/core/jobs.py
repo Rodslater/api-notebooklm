@@ -46,6 +46,7 @@ class JobManager:
         instructions: str = "",
         webhook_url: str | None = None,
         cleanup_notebook: bool = True,
+        owner_id: str = "admin",
     ) -> PodcastJob:
         async with self._lock:
             job_id = f"pod_{uuid.uuid4().hex[:12]}"
@@ -58,6 +59,7 @@ class JobManager:
                 instructions=instructions,
                 webhook_url=webhook_url,
                 cleanup_notebook=cleanup_notebook,
+                owner_id=owner_id,
             )
             self._jobs[job_id] = job
             self._persist_job(job)
@@ -107,9 +109,11 @@ class JobManager:
             self._persist_job(job)
             return job
 
-    async def list_jobs(self, limit: int = 50) -> list[PodcastJob]:
+    async def list_jobs(self, owner_id: str | None = None, limit: int = 50) -> list[PodcastJob]:
         async with self._lock:
             jobs = list(self._jobs.values())
+            if owner_id is not None:
+                jobs = [j for j in jobs if j.owner_id == owner_id]
             jobs.sort(key=lambda j: j.created_at, reverse=True)
             return jobs[:limit]
 

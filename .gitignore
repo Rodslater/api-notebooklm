@@ -7,8 +7,10 @@ __pycache__/
 
 # Credenciais e segredos
 .env
-data/auth/*.json
+data/auth/*
+!data/auth/.gitkeep
 *.key
+*.lock
 
 # Arquivos gerados e uploads
 storage/jobs/*

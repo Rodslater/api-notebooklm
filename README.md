@@ -93,7 +93,7 @@ curl -X POST "http://localhost:8000/api/v1/podcasts" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Podcast Semanal",
-    "text": "O tema de hoje abrange as novidades tecnologicas...",
+    "text": "O tema de hoje abrange as novidades tecnológicas...",
     "format": "brief",
     "length": "default",
     "language": "pt",
@@ -199,3 +199,24 @@ Recarregue o Caddy:
 docker exec -w /etc/caddy caddy caddy reload
 ```
 O Caddy solicitará o certificado SSL automaticamente e roteará as chamadas externas para o container da API.
+
+---
+
+## 6. Segurança, Isolamento e Tokens de API
+
+Para proteger as credenciais do Google e permitir o uso por terceiros de forma isolada, a API implementa múltiplas camadas de segurança:
+
+1. **Tokens Próprios da API (Multi-tenant):**
+   * O token do Google (`master_token.json`) nunca é exposto aos usuários da API.
+   * As chamadas externas exigem tokens Bearer independentes configurados nas variáveis `API_TOKEN` (administrador) e `API_TOKENS` (usuários adicionais).
+   * Formato recomendado no `.env`: `API_TOKENS=cliente_a:token_secreto_a,cliente_b:token_secreto_b`.
+   * Cada usuário só consegue listar, consultar o status e baixar os áudios gerados pelo seu próprio token. A tentativa de acessar tarefas de outro usuário retorna `404 Not Found`.
+
+2. **Prevenção contra Path Traversal:**
+   * Os nomes de arquivos enviados no upload são sanitizados via `Path(...).name` e recebem identificadores UUID únicos.
+   * O endpoint de download valida obrigatoriamente se o caminho do arquivo está contido dentro da pasta restrita `storage/audios/`. Tentativas de apontar para arquivos de sistema ou pastas de autenticação são bloqueadas.
+
+3. **Sanitização de Erros e Logs:**
+   * Mensagens de erro retornadas pela API são higienizadas para remover tokens, cookies e parâmetros confidenciais.
+   * Tracebacks detalhados ficam restritos aos logs internos do servidor e nunca são devolvidos no corpo das respostas HTTP.
+

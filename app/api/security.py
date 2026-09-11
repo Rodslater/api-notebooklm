@@ -1,4 +1,8 @@
-from fastapi import Depends, HTTPException, Security, status
+from dataclasses import dataclass
+import hashlib
+import secrets
+
+from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import settings
@@ -6,13 +10,51 @@ from app.config import settings
 security = HTTPBearer(auto_error=False)
 
 
+@dataclass(frozen=True)
+class AuthenticatedClient:
+    """Dados do cliente autenticado via token de API."""
+
+    client_id: str
+    is_admin: bool
+
+
+def _load_allowed_tokens() -> list[tuple[str, AuthenticatedClient]]:
+    """Carrega os tokens válidos a partir das configurações da aplicação."""
+    tokens: list[tuple[str, AuthenticatedClient]] = []
+
+    # Token principal (administrador)
+    admin_token = settings.api_token.strip()
+    if admin_token:
+        tokens.append((admin_token, AuthenticatedClient(client_id="admin", is_admin=True)))
+
+    # Tokens adicionais para outros usuários
+    additional_tokens_str = settings.api_tokens.strip()
+    if additional_tokens_str:
+        entries = [e.strip() for e in additional_tokens_str.split(",") if e.strip()]
+        for entry in entries:
+            if ":" in entry:
+                client_id, token = entry.split(":", 1)
+                client_id = client_id.strip()
+                token = token.strip()
+                is_admin = client_id.lower() in ("admin", "root", "rodrigo")
+                if token:
+                    tokens.append((token, AuthenticatedClient(client_id=client_id, is_admin=is_admin)))
+            else:
+                token = entry.strip()
+                if token:
+                    short_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()[:8]
+                    tokens.append((token, AuthenticatedClient(client_id=f"user_{short_hash}", is_admin=False)))
+
+    return tokens
+
+
 async def verify_api_token(
     credentials: HTTPAuthorizationCredentials | None = Security(security),
-) -> str:
-    """Valida o Bearer token configurado em API_TOKEN."""
-    expected_token = settings.api_token.strip()
-    if not expected_token:
-        return "unprotected"
+) -> AuthenticatedClient:
+    """Valida o Bearer token contra os tokens configurados na aplicação."""
+    allowed = _load_allowed_tokens()
+    if not allowed:
+        return AuthenticatedClient(client_id="admin", is_admin=True)
 
     if not credentials or not credentials.credentials:
         raise HTTPException(
@@ -21,11 +63,13 @@ async def verify_api_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if credentials.credentials != expected_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de acesso inválido.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    provided = credentials.credentials.strip()
+    for valid_token, client in allowed:
+        if secrets.compare_digest(provided, valid_token):
+            return client
 
-    return credentials.credentials
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Token de acesso inválido.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )

@@ -59,6 +59,7 @@ class PodcastJob(BaseModel):
 
     webhook_url: str | None = None
     cleanup_notebook: bool = True
+    owner_id: str = "admin"
 
     notebook_id: str | None = None
     source_id: str | None = None

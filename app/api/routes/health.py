@@ -9,7 +9,7 @@ router = APIRouter(tags=["Health"])
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
-    """Retorna o estado de execucao do servidor e presenca de credenciais."""
+    """Retorna o estado de execução do servidor e presença de credenciais."""
     storage_path, master_token_path = get_auth_paths()
     authenticated = storage_path.exists() or master_token_path.exists()
     return HealthResponse(

@@ -2,8 +2,9 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api.routes import health, podcasts
@@ -53,6 +54,14 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("Erro interno não tratado ao processar requisição: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Ocorreu um erro interno no servidor. Tente novamente mais tarde."},
+        )
 
     app.include_router(health.router)
     app.include_router(podcasts.router)

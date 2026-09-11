@@ -7,6 +7,7 @@ from app.core.client import get_notebooklm_client
 from app.core.jobs import job_manager
 from app.core.models import JobStatus, PodcastJob
 from app.core.notifier import notify_webhook
+from app.core.sanitizer import sanitize_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,7 @@ async def process_podcast_job(
             job_id=job.id,
             status=JobStatus.FAILED,
             message="Ocorreu um erro durante a geração do podcast.",
-            error_message=str(exc),
+            error_message=sanitize_error_message(exc),
         )
         if failed_job:
             await notify_webhook(failed_job)
