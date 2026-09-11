@@ -1,0 +1,23 @@
+services:
+  api-notebooklm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api-notebooklm
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - NOTEBOOKLM_AUTH_DIR=/app/data/auth
+      - STORAGE_DIR=/app/storage
+    volumes:
+      - ./data/auth:/app/data/auth
+      - ./storage:/app/storage
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

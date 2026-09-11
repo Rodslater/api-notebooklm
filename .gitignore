@@ -1,0 +1,27 @@
+# Ambientes virtuais
+.venv/
+env/
+venv/
+__pycache__/
+*.pyc
+
+# Credenciais e segredos
+.env
+data/auth/*.json
+*.key
+
+# Arquivos gerados e uploads
+storage/jobs/*
+storage/audios/*
+storage/uploads/*
+storage/*.m4a
+storage/*.mp3
+storage/*.wav
+!storage/.gitkeep
+!data/.gitkeep
+
+# IDE e sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
