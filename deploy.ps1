@@ -34,6 +34,9 @@ if (Test-Path "$ProjectDir\.env") {
     scp -i $KeyPath -o StrictHostKeyChecking=accept-new "$ProjectDir\.env" "${User}@${Host_}:${RemoteDir}/.env"
 }
 
+# Garante permissão de escrita para o usuário de deploy na pasta data
+ssh -i $KeyPath -o StrictHostKeyChecking=accept-new "$User@$Host_" "sudo chown -R ${User}:${User} $RemoteDir/data 2>/dev/null || true"
+
 # Envia o master_token.json se existir localmente em data/auth/
 $LocalMasterToken = "$ProjectDir\data\auth\master_token.json"
 if (Test-Path $LocalMasterToken) {

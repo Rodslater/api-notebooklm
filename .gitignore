@@ -16,9 +16,9 @@ data/auth/*
 storage/jobs/*
 storage/audios/*
 storage/uploads/*
-storage/*.m4a
-storage/*.mp3
-storage/*.wav
+*.m4a
+*.mp3
+*.wav
 !storage/.gitkeep
 !data/.gitkeep
 

@@ -48,10 +48,12 @@ async def process_podcast_job(
 
             # 2. Adicionar fonte
             if source_file_path and source_file_path.exists():
+                mime_type = "text/plain" if source_file_path.suffix.lower() in (".log", ".txt", ".md") else None
                 source = await client.sources.add_file(
                     notebook_id,
                     str(source_file_path),
                     title=source_title,
+                    mime_type=mime_type,
                     wait=True,
                 )
             elif source_text:
