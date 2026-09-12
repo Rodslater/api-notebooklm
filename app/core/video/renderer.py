@@ -42,7 +42,7 @@ def render_scene_segment(
     output_path: Path,
     fps: int = 30,
 ) -> Path:
-    """Renderiza um segmento curto de vídeo com efeito Ken Burns e cartão do tópico."""
+    """Renderiza um segmento estável e fluido de vídeo com entrada suave do cartão do tópico."""
     if not scene.image_path or not scene.image_path.exists():
         raise FileNotFoundError(f"Imagem da cena {scene.index} não encontrada.")
 
@@ -53,29 +53,34 @@ def render_scene_segment(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     dur = scene.duration_sec
-    total_frames = max(1, int(fps * dur))
-    fade_dur = min(0.3, dur / 4)
+    card_fade_dur = min(0.5, max(0.2, dur / 6))
 
-    # Aplica zoom suave e fusão suave de entrada e saída
+    # Fundo fotográfico de alta nitidez e entrada fluida do cartão informativo
     filter_graph = (
-        f"[0:v]zoompan=z='min(zoom+0.0008,1.15)':d={total_frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-        f"s=1920x1080:fps={fps},fade=t=in:st=0:d={fade_dur:.2f},fade=t=out:st={dur - fade_dur:.2f}:d={fade_dur:.2f}[bg]; "
-        f"[bg][1:v]overlay=0:0[v]"
+        f"[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080[bg]; "
+        f"[1:v]format=rgba,fade=t=in:st=0:d={card_fade_dur:.2f}:alpha=1[card]; "
+        f"[bg][card]overlay=0:0[v]"
     )
 
     cmd = [
         ffmpeg_exe,
         "-y",
+        "-loop",
+        "1",
+        "-t",
+        f"{dur:.2f}",
         "-i",
         str(scene.image_path),
+        "-loop",
+        "1",
+        "-t",
+        f"{dur:.2f}",
         "-i",
         str(scene.card_path),
         "-filter_complex",
         filter_graph,
         "-map",
         "[v]",
-        "-t",
-        f"{dur:.2f}",
         "-c:v",
         "libx264",
         "-preset",
