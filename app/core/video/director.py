@@ -236,16 +236,19 @@ def _generate_fallback_scenes(
 
     clean_title = podcast_title.strip() or "Podcast em Áudio"
 
-    # Termos temáticos variados para que mesmo o fallback nunca repita a mesma imagem
     fallback_themes = [
-        ("Apresentação e início do debate", "podcast microphone studio"),
-        ("Origem do tema e discussões", "retro computer internet chat"),
-        ("Ponto central da conversa", "technology data center server"),
+        ("Apresentação e início do episódio", "podcast microphone studio"),
+        ("Origem do tema e contexto", "retro computer internet chat"),
+        ("Primeiros tópicos da conversa", "technology data center server"),
+        ("Debate e pontos de vista", "people discussing meeting table"),
         ("Análise detalhada dos fatos", "software developer typing terminal"),
+        ("Casos reais e comentários", "vintage retro tech workspace"),
         ("Momentos marcantes do dia", "neon nightlife city lights"),
+        ("Histórias e curiosidades", "books library cozy reading"),
         ("Reflexão dos apresentadores", "people laughing coffee talk"),
+        ("Destaques da comunidade", "online community network nodes"),
         ("Perspectivas e conclusões", "futuristic digital technology"),
-        ("Encerramento do episódio", "audio sound mixer studio"),
+        ("Encerramento e despedida", "audio sound mixer studio"),
     ]
 
     while current < audio_duration_sec:
@@ -253,7 +256,7 @@ def _generate_fallback_scenes(
         theme_idx = idx % len(fallback_themes)
         topic_suffix, query = fallback_themes[theme_idx]
 
-        topic = clean_title if idx == 0 else f"{clean_title}: {topic_suffix}"
+        topic = topic_suffix
         scenes.append(
             VideoScene(
                 index=idx,

@@ -97,6 +97,10 @@ def generate_topic_card(
     font_topic = _load_ui_font(size=26, bold=False)
 
     main_text = bottom_text.strip() if bottom_text else scene.topic.strip()
+    if ":" in main_text:
+        partes = main_text.split(":")
+        if any(termo in partes[0].lower() for termo in ("podcast", "brasirc", "brasil", "2026")):
+            main_text = partes[-1].strip()
 
     # Cálculo da largura necessária para a caixa
     try:
