@@ -125,6 +125,31 @@ Permite orientar o estilo, o tom e os tópicos de foco dos apresentadores.
 * **`pt` ou `pt-BR`:** Português do Brasil (seleciona as vozes neurais brasileiras do Google).
 * **`en`:** Inglês.
 
+#### 5. Opções de Resumo em Vídeo (`generate_video`)
+Ao ativar `generate_video: true`, você pode escolher entre o vídeo oficial do Google ou a esteira personalizada:
+
+* **Motor do Vídeo (`video_engine`):**
+  * `notebooklm` (padrão): gera o **Resumo em Vídeo nativo** processado nos servidores do Google, com ilustrações animadas e estilos de arte.
+  * `custom`: gera vídeo local 1080p usando o áudio do podcast, análise pelo Gemini Flash, fotos do Pexels e cartões de tópicos dinâmicos renderizados no FFmpeg.
+
+* **Formato do Vídeo Nativo (`video_format`):**
+  * `explainer` (padrão): **Vídeo explicativo** completo com apresentadores e recursos visuais detalhados.
+  * `brief`: **Resumo** visual ágil e condensado.
+  * `cinematic`: formato **cinematográfico** com ritmo imersivo.
+  * `short`: formato **curto** vertical otimizado para redes sociais (possui estilo visual fixo pelo Google).
+
+* **Estilo Visual do Vídeo Nativo (`video_style`):**
+  * `auto_select` (padrão): o NotebookLM seleciona o estilo mais adequado ao tema.
+  * `whiteboard`: animação no estilo quadro branco / desenho à mão.
+  * `anime`: ilustrações no estilo anime japonês.
+  * `watercolor`: arte visual em pintura aquarela.
+  * `classic`: ilustração clássica.
+  * `retro_print`: estilo de impressão retrô.
+  * `paper_craft`: arte em recorte de papel.
+  * `kawaii`: ilustrações no estilo fofo / kawaii.
+  * `heritage`: traços tradicionais e clássicos.
+  * `custom`: estilo personalizado guiado pelo texto fornecido em `video_style_prompt`.
+
 ---
 
 ### Resumo dos Parâmetros
@@ -134,14 +159,18 @@ Permite orientar o estilo, o tom e os tópicos de foco dos apresentadores.
 | `title` | Texto | Data/hora atual | Título descritivo do podcast ou caderno. |
 | `text` | Texto | Opcional | Texto direto para debate (obrigatório se `file` não for enviado). |
 | `file` | Arquivo | Opcional | Arquivo `.txt`, `.md`, `.pdf` ou `.log` com o conteúdo (obrigatório se `text` não for enviado). |
-| `format` | Texto | `brief` | Formato: `deep_dive` (Análise detalhada), `brief` (Resumo), `critique` (Crítica) ou `debate` (Debate). |
-| `length` | Texto | `default` | Duração: `short` (Curto), `default` (Padrão) ou `long` (Longo). |
+| `format` | Texto | `brief` | Formato do áudio: `deep_dive` (Análise detalhada), `brief` (Resumo), `critique` (Crítica) ou `debate` (Debate). |
+| `length` | Texto | `default` | Duração do áudio: `short` (Curto), `default` (Padrão) ou `long` (Longo). |
 | `language` | Texto | `pt` | Idioma do áudio (`pt` ou `pt-BR` para Português do Brasil). |
 | `instructions`| Texto | Humor natural | Instruções de tom, foco e conduta para os apresentadores. |
-| `webhook_url` | URL | Opcional | URL para notificação automática via `POST` quando o áudio estiver pronto (ex: n8n). |
+| `webhook_url` | URL | Opcional | URL para notificação automática via `POST` quando pronto (ex: n8n). |
 | `cleanup_notebook` | Booleano | `true` | Exclui o caderno temporário do Google após o download para poupar cota. |
-| `generate_video` | Booleano | `false` | Gera vídeo 16:9 (1080p) sincronizado ao áudio com transições e cartões dinâmicos. |
-| `video_badge` | Texto | Opcional | Texto de identificação ou marca exibido no topo do cartão visual do vídeo. |
+| `generate_video` | Booleano | `false` | Gera vídeo sincronizado a partir do conteúdo. |
+| `video_engine` | Texto | `notebooklm` | Motor de vídeo: `notebooklm` (nativo do Google) ou `custom` (esteira Pexels/FFmpeg). |
+| `video_format` | Texto | `explainer` | Formato nativo: `explainer` (Vídeo explicativo), `brief` (Resumo), `cinematic` (Cinematográfico) ou `short` (Curto). |
+| `video_style` | Texto | `auto_select` | Estilo nativo: `auto_select`, `whiteboard`, `anime`, `watercolor`, `classic`, `retro_print`, `paper_craft`, `kawaii`, `heritage` ou `custom`. |
+| `video_style_prompt`| Texto | Opcional | Descrição do estilo artístico (obrigatório se `video_style` for `custom`). |
+| `video_badge` | Texto | Opcional | Texto de identificação ou marca exibido no topo do cartão visual (motor `custom`). |
 
 ---
 
@@ -150,7 +179,7 @@ Permite orientar o estilo, o tom e os tópicos de foco dos apresentadores.
 #### Passo 1: Solicitar a geração do podcast
 Envie o conteúdo via JSON ou formulário `multipart/form-data`.
 
-**Exemplo em cURL (JSON):**
+**Exemplo em cURL (JSON com Vídeo Explicativo Nativo no estilo Quadro Branco):**
 ```bash
 curl -X POST "https://podcast.rodslater.com/api/v1/podcasts" \
   -H "Authorization: Bearer SEU_TOKEN" \
@@ -162,12 +191,28 @@ curl -X POST "https://podcast.rodslater.com/api/v1/podcasts" \
     "format": "brief",
     "length": "default",
     "generate_video": true,
-    "video_badge": "BrasIRC Chatcast | #Brasil - 12/09/2026",
+    "video_engine": "notebooklm",
+    "video_format": "explainer",
+    "video_style": "whiteboard",
     "webhook_url": "https://seu-n8n.com/webhook/podcast-pronto"
   }'
 ```
 
-**Exemplo em cURL (Arquivo .txt ou .pdf com vídeo):**
+**Exemplo em cURL (Vídeo Curto / Vertical para Redes Sociais):**
+```bash
+curl -X POST "https://podcast.rodslater.com/api/v1/podcasts" \
+  -H "Authorization: Bearer SEU_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Dica Rápida de Segurança",
+    "text": "Três práticas indispensáveis de segurança cibernética...",
+    "language": "pt",
+    "generate_video": true,
+    "video_format": "short"
+  }'
+```
+
+**Exemplo em cURL (Arquivo com Esteira Customizada de Vídeo e Distintivo):**
 ```bash
 curl -X POST "https://podcast.rodslater.com/api/v1/podcasts" \
   -H "Authorization: Bearer SEU_TOKEN" \
@@ -176,6 +221,7 @@ curl -X POST "https://podcast.rodslater.com/api/v1/podcasts" \
   -F "format=deep_dive" \
   -F "length=long" \
   -F "generate_video=true" \
+  -F "video_engine=custom" \
   -F "video_badge=BrasIRC Chatcast | #Brasil - 12/09/2026"
 ```
 

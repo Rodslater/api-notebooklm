@@ -5,7 +5,15 @@ import uuid
 from pathlib import Path
 
 from app.config import settings
-from app.core.models import JobStatus, PodcastFormat, PodcastJob, PodcastLength
+from app.core.models import (
+    JobStatus,
+    PodcastFormat,
+    PodcastJob,
+    PodcastLength,
+    VideoEngine,
+    VideoFormat,
+    VideoStyle,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +56,10 @@ class JobManager:
         cleanup_notebook: bool = True,
         owner_id: str = "admin",
         generate_video: bool = False,
+        video_engine: VideoEngine = VideoEngine.NOTEBOOKLM,
+        video_format: VideoFormat = VideoFormat.EXPLAINER,
+        video_style: VideoStyle = VideoStyle.AUTO_SELECT,
+        video_style_prompt: str | None = None,
         video_badge: str | None = None,
     ) -> PodcastJob:
         async with self._lock:
@@ -63,6 +75,10 @@ class JobManager:
                 cleanup_notebook=cleanup_notebook,
                 owner_id=owner_id,
                 generate_video=generate_video,
+                video_engine=video_engine,
+                video_format=video_format,
+                video_style=video_style,
+                video_style_prompt=video_style_prompt,
                 video_badge=video_badge,
             )
             self._jobs[job_id] = job
@@ -90,6 +106,10 @@ class JobManager:
         video_file_name: str | None = None,
         video_size_bytes: int | None = None,
         generate_video: bool | None = None,
+        video_engine: VideoEngine | None = None,
+        video_format: VideoFormat | None = None,
+        video_style: VideoStyle | None = None,
+        video_style_prompt: str | None = None,
         video_badge: str | None = None,
     ) -> PodcastJob | None:
         async with self._lock:
@@ -122,6 +142,14 @@ class JobManager:
                 job.video_size_bytes = video_size_bytes
             if generate_video is not None:
                 job.generate_video = generate_video
+            if video_engine is not None:
+                job.video_engine = video_engine
+            if video_format is not None:
+                job.video_format = video_format
+            if video_style is not None:
+                job.video_style = video_style
+            if video_style_prompt is not None:
+                job.video_style_prompt = video_style_prompt
             if video_badge is not None:
                 job.video_badge = video_badge
 

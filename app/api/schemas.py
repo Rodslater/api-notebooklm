@@ -1,7 +1,14 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from app.core.models import PodcastFormat, PodcastJob, PodcastLength
+from app.core.models import (
+    PodcastFormat,
+    PodcastJob,
+    PodcastLength,
+    VideoEngine,
+    VideoFormat,
+    VideoStyle,
+)
 
 
 class PodcastCreateRequest(BaseModel):
@@ -15,8 +22,42 @@ class PodcastCreateRequest(BaseModel):
     instructions: str | None = Field(default=None, description="Instruções extras para os apresentadores.")
     webhook_url: str | None = Field(default=None, description="URL de webhook para notificação ao finalizar.")
     cleanup_notebook: bool = Field(default=True, description="Exclui o caderno do Google após baixar o áudio.")
-    generate_video: bool = Field(default=False, description="Gera vídeo 16:9 sincronizado com o áudio.")
-    video_badge: str | None = Field(default=None, max_length=60, description="Texto exibido no topo do cartão visual do vídeo.")
+    generate_video: bool = Field(default=False, description="Gera vídeo sincronizado a partir do conteúdo.")
+    video_engine: VideoEngine = Field(
+        default=VideoEngine.NOTEBOOKLM,
+        description="Motor do vídeo: notebooklm (nativo do Google) ou custom (esteira própria Pexels/FFmpeg).",
+    )
+    video_format: VideoFormat = Field(
+        default=VideoFormat.EXPLAINER,
+        description="Formato do vídeo nativo: explainer (Vídeo explicativo), brief (Resumo), cinematic (Cinematográfico) ou short (Curto).",
+    )
+    video_style: VideoStyle = Field(
+        default=VideoStyle.AUTO_SELECT,
+        description="Estilo visual do vídeo nativo: auto_select, classic, whiteboard, kawaii, anime, watercolor, retro_print, paper_craft, heritage, custom.",
+    )
+    video_style_prompt: str | None = Field(
+        default=None,
+        description="Instruções de estilo visual quando video_style for custom.",
+    )
+    video_badge: str | None = Field(default=None, max_length=60, description="Texto exibido no topo do cartão visual do vídeo (esteira custom).")
+
+    @model_validator(mode="after")
+    def validate_video_options(self) -> "PodcastCreateRequest":
+        if self.generate_video and self.video_engine == VideoEngine.NOTEBOOKLM:
+            if self.video_format == VideoFormat.SHORT:
+                if self.video_style != VideoStyle.AUTO_SELECT or self.video_style_prompt:
+                    raise ValueError(
+                        "Vídeos no formato 'short' possuem estilo visual fixo e não aceitam video_style ou video_style_prompt."
+                    )
+            if self.video_format == VideoFormat.CINEMATIC and self.video_style_prompt:
+                raise ValueError("Vídeos no formato 'cinematic' não aceitam video_style_prompt.")
+            if self.video_style == VideoStyle.CUSTOM and not (
+                self.video_style_prompt and self.video_style_prompt.strip()
+            ):
+                raise ValueError("O campo video_style_prompt é obrigatório quando video_style for 'custom'.")
+            if self.video_style_prompt and self.video_style != VideoStyle.CUSTOM:
+                raise ValueError("O campo video_style_prompt só pode ser informado quando video_style for 'custom'.")
+        return self
 
 
 class PodcastJobResponse(BaseModel):
@@ -32,6 +73,9 @@ class PodcastJobResponse(BaseModel):
     audio_file_name: str | None = None
     audio_size_bytes: int | None = None
     generate_video: bool = False
+    video_engine: str | None = None
+    video_format: str | None = None
+    video_style: str | None = None
     video_badge: str | None = None
     video_file_name: str | None = None
     video_size_bytes: int | None = None
@@ -69,6 +113,9 @@ class PodcastJobResponse(BaseModel):
             audio_file_name=job.audio_file_name,
             audio_size_bytes=job.audio_size_bytes,
             generate_video=job.generate_video,
+            video_engine=job.video_engine.value if job.generate_video else None,
+            video_format=job.video_format.value if job.generate_video and job.video_engine == VideoEngine.NOTEBOOKLM else None,
+            video_style=job.video_style.value if job.generate_video and job.video_engine == VideoEngine.NOTEBOOKLM else None,
             video_badge=job.video_badge,
             video_file_name=job.video_file_name,
             video_size_bytes=job.video_size_bytes,

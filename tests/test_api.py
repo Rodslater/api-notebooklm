@@ -110,3 +110,62 @@ async def test_download_podcast_lifecycle(tmp_path: Path) -> None:
     finally:
         if audio_file.exists():
             audio_file.unlink()
+
+
+@patch("app.api.routes.podcasts.process_podcast_job")
+def test_create_podcast_with_native_video_json(mock_process: object) -> None:
+    payload = {
+        "title": "Podcast com Vídeo Explicativo",
+        "text": "Texto para gerar podcast e vídeo explicativo nativo.",
+        "generate_video": True,
+        "video_engine": "notebooklm",
+        "video_format": "explainer",
+        "video_style": "whiteboard",
+    }
+    response = client.post("/api/v1/podcasts", json=payload, headers=AUTH_HEADER)
+    assert response.status_code == 202
+    data = response.json()
+    assert data["generate_video"] is True
+    assert data["video_engine"] == "notebooklm"
+    assert data["video_format"] == "explainer"
+    assert data["video_style"] == "whiteboard"
+
+
+@patch("app.api.routes.podcasts.process_podcast_job")
+def test_create_podcast_with_short_video_json(mock_process: object) -> None:
+    payload = {
+        "title": "Vídeo Curto",
+        "text": "Conteúdo para vídeo curto vertical.",
+        "generate_video": True,
+        "video_format": "short",
+        "video_style": "auto_select",
+    }
+    response = client.post("/api/v1/podcasts", json=payload, headers=AUTH_HEADER)
+    assert response.status_code == 202
+    data = response.json()
+    assert data["generate_video"] is True
+    assert data["video_format"] == "short"
+
+
+def test_create_podcast_short_video_rejects_custom_style() -> None:
+    payload = {
+        "title": "Vídeo Curto Inválido",
+        "text": "Texto teste",
+        "generate_video": True,
+        "video_format": "short",
+        "video_style": "anime",
+    }
+    response = client.post("/api/v1/podcasts", json=payload, headers=AUTH_HEADER)
+    assert response.status_code == 422
+
+
+def test_create_podcast_custom_style_requires_prompt() -> None:
+    payload = {
+        "title": "Vídeo Estilo Personalizado",
+        "text": "Texto teste",
+        "generate_video": True,
+        "video_style": "custom",
+    }
+    response = client.post("/api/v1/podcasts", json=payload, headers=AUTH_HEADER)
+    assert response.status_code == 422
+

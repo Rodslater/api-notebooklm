@@ -1,7 +1,12 @@
 from datetime import datetime, timezone
 from enum import Enum
 from pydantic import BaseModel, Field
-from notebooklm import AudioFormat, AudioLength
+from notebooklm import (
+    AudioFormat,
+    AudioLength,
+    VideoFormat as NlmVideoFormat,
+    VideoStyle as NlmVideoStyle,
+)
 
 
 class JobStatus(str, Enum):
@@ -45,6 +50,55 @@ class PodcastLength(str, Enum):
         return mapping[self]
 
 
+class VideoEngine(str, Enum):
+    NOTEBOOKLM = "notebooklm"
+    CUSTOM = "custom"
+
+
+class VideoFormat(str, Enum):
+    EXPLAINER = "explainer"
+    BRIEF = "brief"
+    CINEMATIC = "cinematic"
+    SHORT = "short"
+
+    def to_notebooklm(self) -> NlmVideoFormat:
+        mapping = {
+            VideoFormat.EXPLAINER: NlmVideoFormat.EXPLAINER,
+            VideoFormat.BRIEF: NlmVideoFormat.BRIEF,
+            VideoFormat.CINEMATIC: NlmVideoFormat.CINEMATIC,
+            VideoFormat.SHORT: NlmVideoFormat.SHORT,
+        }
+        return mapping[self]
+
+
+class VideoStyle(str, Enum):
+    AUTO_SELECT = "auto_select"
+    CLASSIC = "classic"
+    WHITEBOARD = "whiteboard"
+    KAWAII = "kawaii"
+    ANIME = "anime"
+    WATERCOLOR = "watercolor"
+    RETRO_PRINT = "retro_print"
+    PAPER_CRAFT = "paper_craft"
+    HERITAGE = "heritage"
+    CUSTOM = "custom"
+
+    def to_notebooklm(self) -> NlmVideoStyle:
+        mapping = {
+            VideoStyle.AUTO_SELECT: NlmVideoStyle.AUTO_SELECT,
+            VideoStyle.CLASSIC: NlmVideoStyle.CLASSIC,
+            VideoStyle.WHITEBOARD: NlmVideoStyle.WHITEBOARD,
+            VideoStyle.KAWAII: NlmVideoStyle.KAWAII,
+            VideoStyle.ANIME: NlmVideoStyle.ANIME,
+            VideoStyle.WATERCOLOR: NlmVideoStyle.WATERCOLOR,
+            VideoStyle.RETRO_PRINT: NlmVideoStyle.RETRO_PRINT,
+            VideoStyle.PAPER_CRAFT: NlmVideoStyle.PAPER_CRAFT,
+            VideoStyle.HERITAGE: NlmVideoStyle.HERITAGE,
+            VideoStyle.CUSTOM: NlmVideoStyle.CUSTOM,
+        }
+        return mapping[self]
+
+
 class PodcastJob(BaseModel):
     """Representação interna de uma tarefa de geração de podcast."""
 
@@ -72,6 +126,10 @@ class PodcastJob(BaseModel):
     audio_size_bytes: int | None = None
 
     generate_video: bool = False
+    video_engine: VideoEngine = VideoEngine.NOTEBOOKLM
+    video_format: VideoFormat = VideoFormat.EXPLAINER
+    video_style: VideoStyle = VideoStyle.AUTO_SELECT
+    video_style_prompt: str | None = None
     video_badge: str | None = None
     video_file_path: str | None = None
     video_file_name: str | None = None

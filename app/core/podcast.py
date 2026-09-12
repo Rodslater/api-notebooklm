@@ -5,7 +5,7 @@ from pathlib import Path
 from app.config import settings
 from app.core.client import get_notebooklm_client
 from app.core.jobs import job_manager
-from app.core.models import JobStatus, PodcastJob
+from app.core.models import JobStatus, PodcastJob, VideoEngine
 from app.core.notifier import notify_webhook
 from app.core.sanitizer import sanitize_error_message
 from app.core.video import generate_podcast_video
@@ -115,26 +115,100 @@ async def process_podcast_job(
 
             file_size = Path(saved_path).stat().st_size if Path(saved_path).exists() else 0
 
-            # 6. Limpeza do caderno no Google se configurado
-            if job.cleanup_notebook and notebook_id:
-                try:
-                    await client.notebooks.delete(notebook_id)
-                    logger.info("Caderno %s excluído do NotebookLM após download.", notebook_id)
-                except Exception as e:
-                    logger.warning("Não foi possível excluir caderno temporário %s: %s", notebook_id, e)
-
-            # 7. Finalização do áudio e transição para vídeo se solicitado
+            # 6. Finalização e geração de vídeo se solicitado
             if job.generate_video:
-                await job_manager.update_job_status(
-                    job_id=job.id,
-                    status=JobStatus.GENERATING_VIDEO,
-                    message="Áudio concluído com sucesso. Iniciando geração do vídeo...",
-                    audio_file_path=str(saved_path),
-                    audio_file_name=f"{job.id}.m4a",
-                    audio_size_bytes=file_size,
-                )
-                await generate_podcast_video(job.id)
+                if job.video_engine == VideoEngine.NOTEBOOKLM:
+                    await job_manager.update_job_status(
+                        job_id=job.id,
+                        status=JobStatus.GENERATING_VIDEO,
+                        message="Áudio concluído. Solicitando Resumo em Vídeo nativo no NotebookLM...",
+                        audio_file_path=str(saved_path),
+                        audio_file_name=f"{job.id}.m4a",
+                        audio_size_bytes=file_size,
+                    )
+
+                    video_gen = await client.artifacts.generate_video(
+                        notebook_id=notebook_id,
+                        source_ids=[source_id] if source_id else None,
+                        language=job.language,
+                        instructions=instructions,
+                        video_format=job.video_format.to_notebooklm(),
+                        video_style=job.video_style.to_notebooklm(),
+                        style_prompt=job.video_style_prompt,
+                    )
+
+                    video_task_id = video_gen.task_id
+                    await job_manager.update_job_status(
+                        job_id=job.id,
+                        status=JobStatus.GENERATING_VIDEO,
+                        message="Vídeo solicitado no NotebookLM. Aguardando renderização na nuvem do Google...",
+                        task_id=video_task_id,
+                    )
+
+                    await client.artifacts.wait_for_completion(
+                        notebook_id=notebook_id,
+                        task_id=video_task_id,
+                        timeout=settings.generation_timeout_seconds,
+                    )
+
+                    video_dir = settings.storage_dir / "videos"
+                    video_dir.mkdir(parents=True, exist_ok=True)
+                    video_file_path = video_dir / f"{job.id}.mp4"
+
+                    await job_manager.update_job_status(
+                        job_id=job.id,
+                        status=JobStatus.GENERATING_VIDEO,
+                        message="Vídeo concluído pelo Google. Baixando arquivo .mp4 para a VPS...",
+                    )
+
+                    saved_video_path = await client.artifacts.download_video(
+                        notebook_id=notebook_id,
+                        output_path=str(video_file_path),
+                    )
+                    video_size = Path(saved_video_path).stat().st_size if Path(saved_video_path).exists() else 0
+
+                    if job.cleanup_notebook and notebook_id:
+                        try:
+                            await client.notebooks.delete(notebook_id)
+                            logger.info("Caderno %s excluído do NotebookLM após download de áudio e vídeo.", notebook_id)
+                        except Exception as e:
+                            logger.warning("Não foi possível excluir caderno temporário %s: %s", notebook_id, e)
+
+                    final_job = await job_manager.update_job_status(
+                        job_id=job.id,
+                        status=JobStatus.COMPLETED,
+                        message="Podcast e vídeo nativo concluídos com sucesso.",
+                        video_file_path=str(saved_video_path),
+                        video_file_name=f"{job.id}.mp4",
+                        video_size_bytes=video_size,
+                    )
+                    if final_job:
+                        await notify_webhook(final_job)
+                else:
+                    if job.cleanup_notebook and notebook_id:
+                        try:
+                            await client.notebooks.delete(notebook_id)
+                            logger.info("Caderno %s excluído do NotebookLM após download do áudio.", notebook_id)
+                        except Exception as e:
+                            logger.warning("Não foi possível excluir caderno temporário %s: %s", notebook_id, e)
+
+                    await job_manager.update_job_status(
+                        job_id=job.id,
+                        status=JobStatus.GENERATING_VIDEO,
+                        message="Áudio concluído com sucesso. Iniciando esteira própria de vídeo...",
+                        audio_file_path=str(saved_path),
+                        audio_file_name=f"{job.id}.m4a",
+                        audio_size_bytes=file_size,
+                    )
+                    await generate_podcast_video(job.id)
             else:
+                if job.cleanup_notebook and notebook_id:
+                    try:
+                        await client.notebooks.delete(notebook_id)
+                        logger.info("Caderno %s excluído do NotebookLM após download.", notebook_id)
+                    except Exception as e:
+                        logger.warning("Não foi possível excluir caderno temporário %s: %s", notebook_id, e)
+
                 final_job = await job_manager.update_job_status(
                     job_id=job.id,
                     status=JobStatus.COMPLETED,

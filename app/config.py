@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     cleanup_notebook: bool = True
 
     # Configurações para geração de vídeo
+    default_video_engine: str = "notebooklm"
+    default_video_format: str = "explainer"
+    default_video_style: str = "auto_select"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.6-flash"
     pexels_api_key: str = ""

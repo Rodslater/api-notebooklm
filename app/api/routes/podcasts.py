@@ -12,7 +12,14 @@ from app.api.schemas import PodcastCreateRequest, PodcastJobResponse
 from app.api.security import AuthenticatedClient, verify_api_token
 from app.config import settings
 from app.core.jobs import job_manager
-from app.core.models import JobStatus, PodcastFormat, PodcastLength
+from app.core.models import (
+    JobStatus,
+    PodcastFormat,
+    PodcastLength,
+    VideoEngine,
+    VideoFormat,
+    VideoStyle,
+)
 from app.core.podcast import process_podcast_job
 from app.core.sanitizer import sanitize_upload_filename
 from app.core.video import generate_podcast_video
@@ -43,6 +50,10 @@ async def create_podcast(
     webhook_url: str | None = Form(None),
     cleanup_notebook: bool = Form(True),
     generate_video: bool = Form(False),
+    video_engine: str | None = Form(None),
+    video_format: str | None = Form(None),
+    video_style: str | None = Form(None),
+    video_style_prompt: str | None = Form(None),
     video_badge: str | None = Form(None),
     user: AuthenticatedClient = Depends(verify_api_token),
 ) -> PodcastJobResponse:
@@ -64,6 +75,10 @@ async def create_podcast(
             webhook_url = req.webhook_url
             cleanup_notebook = req.cleanup_notebook
             generate_video = req.generate_video
+            video_engine = req.video_engine.value
+            video_format = req.video_format.value
+            video_style = req.video_style.value
+            video_style_prompt = req.video_style_prompt
             video_badge = req.video_badge
         except Exception as exc:
             raise HTTPException(
@@ -114,6 +129,47 @@ async def create_podcast(
 
     resolved_instructions = instructions if instructions is not None else settings.default_instructions
 
+    try:
+        resolved_video_engine = VideoEngine(video_engine) if video_engine else (
+            VideoEngine.CUSTOM if video_badge else VideoEngine(settings.default_video_engine)
+        )
+    except ValueError:
+        resolved_video_engine = VideoEngine.NOTEBOOKLM
+
+    try:
+        resolved_video_format = VideoFormat(video_format) if video_format else VideoFormat(settings.default_video_format)
+    except ValueError:
+        resolved_video_format = VideoFormat.EXPLAINER
+
+    try:
+        resolved_video_style = VideoStyle(video_style) if video_style else VideoStyle(settings.default_video_style)
+    except ValueError:
+        resolved_video_style = VideoStyle.AUTO_SELECT
+
+    # Validação para requisições com vídeo nativo
+    if generate_video and resolved_video_engine == VideoEngine.NOTEBOOKLM:
+        if resolved_video_format == VideoFormat.SHORT:
+            if resolved_video_style != VideoStyle.AUTO_SELECT or video_style_prompt:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Vídeos no formato 'short' possuem estilo visual fixo e não aceitam video_style ou video_style_prompt.",
+                )
+        if resolved_video_format == VideoFormat.CINEMATIC and video_style_prompt:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Vídeos no formato 'cinematic' não aceitam video_style_prompt.",
+            )
+        if resolved_video_style == VideoStyle.CUSTOM and not (video_style_prompt and video_style_prompt.strip()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="O campo video_style_prompt é obrigatório quando video_style for 'custom'.",
+            )
+        if video_style_prompt and resolved_video_style != VideoStyle.CUSTOM:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="O campo video_style_prompt só pode ser informado quando video_style for 'custom'.",
+            )
+
     job = await job_manager.create_job(
         title=resolved_title,
         language=resolved_lang,
@@ -124,6 +180,10 @@ async def create_podcast(
         cleanup_notebook=cleanup_notebook,
         owner_id=user.client_id,
         generate_video=generate_video,
+        video_engine=resolved_video_engine,
+        video_format=resolved_video_format,
+        video_style=resolved_video_style,
+        video_style_prompt=video_style_prompt,
         video_badge=video_badge,
     )
 
