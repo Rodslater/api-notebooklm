@@ -140,6 +140,8 @@ Permite orientar o estilo, o tom e os tópicos de foco dos apresentadores.
 | `instructions`| Texto | Humor natural | Instruções de tom, foco e conduta para os apresentadores. |
 | `webhook_url` | URL | Opcional | URL para notificação automática via `POST` quando o áudio estiver pronto (ex: n8n). |
 | `cleanup_notebook` | Booleano | `true` | Exclui o caderno temporário do Google após o download para poupar cota. |
+| `generate_video` | Booleano | `false` | Gera vídeo 16:9 (1080p) sincronizado ao áudio com transições e cartões dinâmicos. |
+| `video_badge` | Texto | Opcional | Texto de identificação ou marca exibido no topo do cartão visual do vídeo. |
 
 ---
 
@@ -159,18 +161,22 @@ curl -X POST "https://podcast.rodslater.com/api/v1/podcasts" \
     "language": "pt",
     "format": "brief",
     "length": "default",
+    "generate_video": true,
+    "video_badge": "BrasIRC Chatcast | #Brasil - 12/09/2026",
     "webhook_url": "https://seu-n8n.com/webhook/podcast-pronto"
   }'
 ```
 
-**Exemplo em cURL (Arquivo .txt ou .pdf):**
+**Exemplo em cURL (Arquivo .txt ou .pdf com vídeo):**
 ```bash
 curl -X POST "https://podcast.rodslater.com/api/v1/podcasts" \
   -H "Authorization: Bearer SEU_TOKEN" \
   -F "file=@relatorio.pdf" \
   -F "title=Podcast do Relatório" \
   -F "format=deep_dive" \
-  -F "length=long"
+  -F "length=long" \
+  -F "generate_video=true" \
+  -F "video_badge=BrasIRC Chatcast | #Brasil - 12/09/2026"
 ```
 
 **Resposta imediata (HTTP 202 Accepted):**
@@ -210,7 +216,8 @@ curl -X GET "https://podcast.rodslater.com/api/v1/podcasts/pod_a1b2c3d4e5f6" \
 * `uploading_source`: enviando o texto ou arquivo para a nuvem.
 * `generating_audio`: áudio em geração pela IA do Google (duração típica: 3 a 8 minutos).
 * `downloading_audio`: áudio finalizado pelo Google; baixando o `.m4a` para a VPS.
-* `completed`: processamento concluído com sucesso; áudio disponível para download.
+* `generating_video`: estruturando cenas com Gemini Flash, coletando fotos no Pexels e renderizando vídeo no FFmpeg.
+* `completed`: processamento concluído com sucesso; áudio e vídeo disponíveis para download.
 * `failed`: ocorreu uma falha (mensagem segura disponível em `error_message`).
 
 **Resposta quando concluído:**
@@ -219,16 +226,20 @@ curl -X GET "https://podcast.rodslater.com/api/v1/podcasts/pod_a1b2c3d4e5f6" \
   "job_id": "pod_a1b2c3d4e5f6",
   "title": "Novidades sobre Tecnologia",
   "status": "completed",
-  "status_message": "Podcast gerado e disponível para download.",
+  "status_message": "Podcast e vídeo gerados com sucesso.",
   "audio_file_name": "pod_a1b2c3d4e5f6.m4a",
   "audio_size_bytes": 14285712,
-  "download_url": "https://podcast.rodslater.com/api/v1/podcasts/pod_a1b2c3d4e5f6/download"
+  "generate_video": true,
+  "video_file_name": "pod_a1b2c3d4e5f6.mp4",
+  "video_size_bytes": 35841920,
+  "download_url": "https://podcast.rodslater.com/api/v1/podcasts/pod_a1b2c3d4e5f6/download",
+  "video_download_url": "https://podcast.rodslater.com/api/v1/podcasts/pod_a1b2c3d4e5f6/download-video"
 }
 ```
 
 ---
 
-#### Passo 3: Baixar o arquivo de áudio final (.m4a)
+#### Passo 3: Baixar o arquivo de áudio (.m4a)
 Quando o status for `completed`, baixe o arquivo de áudio diretamente:
 
 ```bash
@@ -238,6 +249,28 @@ curl -X GET "https://podcast.rodslater.com/api/v1/podcasts/pod_a1b2c3d4e5f6/down
 ```
 
 ---
+
+#### Passo 3b: Baixar o arquivo de vídeo final (.mp4)
+Se o vídeo foi solicitado (`generate_video=true`), baixe o `.mp4` diretamente:
+
+```bash
+curl -X GET "https://podcast.rodslater.com/api/v1/podcasts/pod_a1b2c3d4e5f6/download-video" \
+  -H "Authorization: Bearer SEU_TOKEN" \
+  -o "podcast_video.mp4"
+```
+
+---
+
+#### Passo 3c: Gerar vídeo para um podcast já existente
+Você pode gerar o vídeo a qualquer momento a partir de um podcast concluído sem regerar o áudio, podendo inclusive definir ou sobrescrever o distintivo do cartão:
+
+```bash
+curl -X POST "https://podcast.rodslater.com/api/v1/podcasts/pod_a1b2c3d4e5f6/video?video_badge=BrasIRC%20Chatcast" \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
+---
+
 
 #### Passo 4: Listar tarefas recentes
 Para listar as últimas tarefas geradas pelo seu token:
@@ -273,8 +306,22 @@ mkdir -p /home/ubuntu/apps/api-notebooklm/data/auth
 mkdir -p /home/ubuntu/apps/api-notebooklm/storage
 ```
 
-### 2. Copiar os arquivos
-Copie o código-fonte, o `.env` e o arquivo `master_token.json` para a pasta na VPS.
+### 2. Configurar variáveis e autenticação
+Copie o código-fonte, o arquivo `master_token.json` (para `data/auth/`) e configure o `.env` na VPS com as chaves necessárias:
+
+```ini
+# Autenticação e Portas
+PORT=8000
+API_TOKEN=seu_token_admin
+API_TOKENS=brasirc:brasirc_BgIoZQR3-CbF58pOeJ1bAgV3RgG3ZjA861cIV3p19H0
+
+# Direção e Renderização de Vídeo (Opcional, ativado via generate_video)
+GEMINI_API_KEY=sua_chave_gemini
+GEMINI_MODEL=gemini-3.6-flash
+PEXELS_API_KEY=sua_chave_pexels
+VIDEO_DIRECTOR_PROVIDER=gemini
+VIDEO_FPS=30
+```
 
 ### 3. Subir o container Docker
 Dentro da pasta `/home/ubuntu/apps/api-notebooklm`:

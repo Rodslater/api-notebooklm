@@ -10,6 +10,7 @@ class JobStatus(str, Enum):
     UPLOADING_SOURCE = "uploading_source"
     GENERATING_AUDIO = "generating_audio"
     DOWNLOADING_AUDIO = "downloading_audio"
+    GENERATING_VIDEO = "generating_video"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -69,6 +70,12 @@ class PodcastJob(BaseModel):
     audio_file_path: str | None = None
     audio_file_name: str | None = None
     audio_size_bytes: int | None = None
+
+    generate_video: bool = False
+    video_badge: str | None = None
+    video_file_path: str | None = None
+    video_file_name: str | None = None
+    video_size_bytes: int | None = None
 
     error_message: str | None = None
 

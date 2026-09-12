@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     generation_timeout_seconds: float = 1200.0
     cleanup_notebook: bool = True
 
+    # Configurações para geração de vídeo
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.6-flash"
+    pexels_api_key: str = ""
+    openai_api_key: str = ""
+    video_director_provider: str = "gemini"
+    video_width: int = 1920
+    video_height: int = 1080
+    video_fps: int = 30
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

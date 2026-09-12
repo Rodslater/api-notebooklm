@@ -8,6 +8,7 @@ from app.core.jobs import job_manager
 from app.core.models import JobStatus, PodcastJob
 from app.core.notifier import notify_webhook
 from app.core.sanitizer import sanitize_error_message
+from app.core.video import generate_podcast_video
 
 logger = logging.getLogger(__name__)
 
@@ -122,18 +123,28 @@ async def process_podcast_job(
                 except Exception as e:
                     logger.warning("Não foi possível excluir caderno temporário %s: %s", notebook_id, e)
 
-            # 7. Finalização com sucesso
-            final_job = await job_manager.update_job_status(
-                job_id=job.id,
-                status=JobStatus.COMPLETED,
-                message="Podcast gerado e disponível para download.",
-                audio_file_path=str(saved_path),
-                audio_file_name=f"{job.id}.m4a",
-                audio_size_bytes=file_size,
-            )
-
-            if final_job:
-                await notify_webhook(final_job)
+            # 7. Finalização do áudio e transição para vídeo se solicitado
+            if job.generate_video:
+                await job_manager.update_job_status(
+                    job_id=job.id,
+                    status=JobStatus.GENERATING_VIDEO,
+                    message="Áudio concluído com sucesso. Iniciando geração do vídeo...",
+                    audio_file_path=str(saved_path),
+                    audio_file_name=f"{job.id}.m4a",
+                    audio_size_bytes=file_size,
+                )
+                await generate_podcast_video(job.id)
+            else:
+                final_job = await job_manager.update_job_status(
+                    job_id=job.id,
+                    status=JobStatus.COMPLETED,
+                    message="Podcast gerado e disponível para download.",
+                    audio_file_path=str(saved_path),
+                    audio_file_name=f"{job.id}.m4a",
+                    audio_size_bytes=file_size,
+                )
+                if final_job:
+                    await notify_webhook(final_job)
 
     except Exception as exc:
         logger.exception("Erro ao processar tarefa de podcast %s: %s", job.id, exc)

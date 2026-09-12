@@ -47,6 +47,8 @@ class JobManager:
         webhook_url: str | None = None,
         cleanup_notebook: bool = True,
         owner_id: str = "admin",
+        generate_video: bool = False,
+        video_badge: str | None = None,
     ) -> PodcastJob:
         async with self._lock:
             job_id = f"pod_{uuid.uuid4().hex[:12]}"
@@ -60,6 +62,8 @@ class JobManager:
                 webhook_url=webhook_url,
                 cleanup_notebook=cleanup_notebook,
                 owner_id=owner_id,
+                generate_video=generate_video,
+                video_badge=video_badge,
             )
             self._jobs[job_id] = job
             self._persist_job(job)
@@ -82,6 +86,11 @@ class JobManager:
         audio_file_path: str | None = None,
         audio_file_name: str | None = None,
         audio_size_bytes: int | None = None,
+        video_file_path: str | None = None,
+        video_file_name: str | None = None,
+        video_size_bytes: int | None = None,
+        generate_video: bool | None = None,
+        video_badge: str | None = None,
     ) -> PodcastJob | None:
         async with self._lock:
             job = self._jobs.get(job_id)
@@ -105,6 +114,16 @@ class JobManager:
                 job.audio_file_name = audio_file_name
             if audio_size_bytes is not None:
                 job.audio_size_bytes = audio_size_bytes
+            if video_file_path is not None:
+                job.video_file_path = video_file_path
+            if video_file_name is not None:
+                job.video_file_name = video_file_name
+            if video_size_bytes is not None:
+                job.video_size_bytes = video_size_bytes
+            if generate_video is not None:
+                job.generate_video = generate_video
+            if video_badge is not None:
+                job.video_badge = video_badge
 
             self._persist_job(job)
             return job

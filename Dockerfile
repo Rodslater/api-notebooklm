@@ -6,10 +6,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Instala dependencias do sistema necessarias para compilacao leve e certificados
+# Instala dependências do sistema necessárias para compilação leve, certificados, fontes e renderização de vídeo
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    ffmpeg \
+    fonts-dejavu-core \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Copia e instala dependencias Python

@@ -15,10 +15,13 @@ data/auth/*
 # Arquivos gerados e uploads
 storage/jobs/*
 storage/audios/*
+storage/videos/*
+storage/temp_video/*
 storage/uploads/*
 *.m4a
 *.mp3
 *.wav
+*.mp4
 !storage/.gitkeep
 !data/.gitkeep
 
