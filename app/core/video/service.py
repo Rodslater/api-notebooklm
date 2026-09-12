@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import shutil
 from pathlib import Path
@@ -94,8 +95,9 @@ async def generate_podcast_video(job_id: str) -> None:
             message="Renderizando segmentos e unindo ao áudio via FFmpeg...",
         )
 
-        # 5. Renderização e montagem do vídeo no FFmpeg
-        assemble_video(
+        # 5. Renderização e montagem do vídeo no FFmpeg em thread dedicada para não bloquear o loop assíncrono
+        await asyncio.to_thread(
+            assemble_video,
             scenes=scenes,
             audio_path=audio_path,
             output_mp4=final_video_path,
