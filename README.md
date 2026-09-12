@@ -295,43 +295,81 @@ Resposta:
 
 ---
 
-## 5. Deploy na VPS Oracle (147.15.18.148)
+## 5. Deploy em Produção
 
-A VPS já conta com Docker e o Caddy rodando na rede Docker compartilhada chamada `proxy`.
+### 5.1. Produção Principal: VPS Hostinger via EasyPanel
 
-### 1. Criar pasta da aplicação na VPS
-Na VPS, crie a pasta em `/home/ubuntu/apps/api-notebooklm`:
-```bash
-mkdir -p /home/ubuntu/apps/api-notebooklm/data/auth
-mkdir -p /home/ubuntu/apps/api-notebooklm/storage
-```
+A aplicação está hospedada em produção na VPS Hostinger com 4 vCPUs e 16 GB de RAM, garantindo renderização de vídeo Full HD em menos de 4 minutos.
 
-### 2. Configurar variáveis e autenticação
-Copie o código-fonte, o arquivo `master_token.json` (para `data/auth/`) e configure o `.env` na VPS com as chaves necessárias:
+#### 1. Criar aplicação no EasyPanel
+* Acesse o EasyPanel e crie um novo serviço do tipo **App**.
+* Na aba **Source / Git**, configure o repositório:
+  * **Repository:** `Rodslater/api-notebooklm` (ou via deploy key SSH)
+  * **Branch:** `main`
+  * **Build Type:** `Dockerfile`
 
+#### 2. Configurar Variáveis de Ambiente (Aba *Environment*)
 ```ini
-# Autenticação e Portas
 PORT=8000
-API_TOKEN=seu_token_admin
+HOST=0.0.0.0
+
+# Autenticação e tokens de acesso
+API_TOKEN=seu_token_admin_mestre
 API_TOKENS=brasirc:brasirc_BgIoZQR3-CbF58pOeJ1bAgV3RgG3ZjA861cIV3p19H0
 
-# Direção e Renderização de Vídeo (Opcional, ativado via generate_video)
+# Diretórios internos de persistência
+NOTEBOOKLM_AUTH_DIR=/app/data/auth
+STORAGE_DIR=/app/storage
+
+# Padrões do NotebookLM
+DEFAULT_LANGUAGE=pt
+DEFAULT_AUDIO_FORMAT=brief
+DEFAULT_AUDIO_LENGTH=default
+DEFAULT_INSTRUCTIONS=Apresente em português brasileiro natural, descontraído e bem-humorado. Os apresentadores devem demonstrar carisma, usar tiradas inteligentes, analogias divertidas e manter a conversa leve e cativante, resumindo os pontos essenciais com clareza.
+GENERATION_TIMEOUT_SECONDS=1200
+CLEANUP_NOTEBOOK=true
+
+# Esteira de vídeo sincronizado (IA e Pexels)
 GEMINI_API_KEY=sua_chave_gemini
-GEMINI_MODEL=gemini-3.6-flash
+GEMINI_MODEL=gemini-flash-latest
 PEXELS_API_KEY=sua_chave_pexels
 VIDEO_DIRECTOR_PROVIDER=gemini
 VIDEO_FPS=30
 ```
 
-### 3. Subir o container Docker
-Dentro da pasta `/home/ubuntu/apps/api-notebooklm`:
+#### 3. Volumes Persistentes (Aba *Mounts*)
+Para preservar os áudios gerados e as credenciais de sessão do Google a cada novo deploy, configure os volumes:
+
+| Tipo | Caminho no Container | Nome do Volume |
+| :--- | :--- | :--- |
+| Volume | `/app/data/auth` | `api-notebooklm-auth` |
+| Volume | `/app/storage` | `api-notebooklm-storage` |
+
+*Copie os arquivos de sessão `master_token.json` e `storage_state.json` para dentro do volume `/app/data/auth` para manter a autenticação ativa.*
+
+#### 4. Domínio e Porta (Aba *Domains*)
+* **Porta do Container:** `8000`
+* **Domínio:** `podcast.rodslater.com` (o Traefik do EasyPanel emite o certificado SSL Let's Encrypt automaticamente).
+
+---
+
+### 5.2. Ambiente Alternativo: VPS Oracle (Docker Compose + Caddy)
+
+Para rodar em servidores isolados sem EasyPanel:
+
+#### 1. Estrutura de pastas
+```bash
+mkdir -p /home/ubuntu/apps/api-notebooklm/data/auth
+mkdir -p /home/ubuntu/apps/api-notebooklm/storage
+```
+
+#### 2. Subir com Docker Compose
 ```bash
 docker compose up -d --build
 ```
 
-### 4. Configurar no Caddyfile da VPS
-Edite o arquivo `/home/ubuntu/apps/caddy/Caddyfile` e adicione o bloco para o subdomínio desejado (exemplo: `podcast.rodslater.com`):
-
+#### 3. Proxy Reverso com Caddy
+No `Caddyfile`:
 ```caddy
 podcast.rodslater.com {
     reverse_proxy api-notebooklm:8000
@@ -346,7 +384,6 @@ podcast.rodslater.com {
     }
 }
 ```
-
 Recarregue o Caddy:
 ```bash
 docker exec -w /etc/caddy caddy caddy reload
