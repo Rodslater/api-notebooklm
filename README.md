@@ -150,6 +150,11 @@ Ao ativar `generate_video: true`, você pode escolher entre o vídeo oficial do 
   * `heritage`: traços tradicionais e clássicos.
   * `custom`: estilo personalizado guiado pelo texto fornecido em `video_style_prompt`.
 
+* **Pós-processamento Automático do Vídeo Nativo:**
+  Ao gerar com o motor `notebooklm`, a API aplica automaticamente duas etapas de acabamento via FFmpeg antes de disponibilizar o arquivo para download:
+  1. **Remoção da Vinheta Promocional Final:** Os últimos 3.1 segundos (tela cheia com animação de encerramento do Google) são cortados de forma limpa, encerrando o vídeo exatamente na cena final do conteúdo.
+  2. **Sobreposição da Logo:** A logo configurada em `NATIVE_VIDEO_LOGO_PATH` (por padrão `app/assets/logo_brasirc.png`) é posicionada rente ao canto inferior direito, cobrindo integralmente a marca "Gemini Notebook" tanto em proporção vertical (9:16) quanto horizontal (16:9).
+
 ---
 
 ### Resumo dos Parâmetros
@@ -374,6 +379,10 @@ DEFAULT_AUDIO_LENGTH=default
 DEFAULT_INSTRUCTIONS=Apresente em português brasileiro natural, descontraído e bem-humorado. Os apresentadores devem demonstrar carisma, usar tiradas inteligentes, analogias divertidas e manter a conversa leve e cativante, resumindo os pontos essenciais com clareza.
 GENERATION_TIMEOUT_SECONDS=1200
 CLEANUP_NOTEBOOK=true
+
+# Pós-processamento do vídeo nativo (NotebookLM)
+NATIVE_VIDEO_TRIM_SECONDS=3.1
+NATIVE_VIDEO_LOGO_PATH=/app/app/assets/logo_brasirc.png
 
 # Esteira de vídeo sincronizado (IA e Pexels)
 GEMINI_API_KEY=sua_chave_gemini

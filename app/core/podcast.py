@@ -9,6 +9,7 @@ from app.core.models import JobStatus, PodcastJob, VideoEngine
 from app.core.notifier import notify_webhook
 from app.core.sanitizer import sanitize_error_message
 from app.core.video import generate_podcast_video
+from app.core.video.postprocessor import postprocess_native_video
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +166,19 @@ async def process_podcast_job(
                         notebook_id=notebook_id,
                         output_path=str(video_file_path),
                     )
-                    video_size = Path(saved_video_path).stat().st_size if Path(saved_video_path).exists() else 0
+
+                    await job_manager.update_job_status(
+                        job_id=job.id,
+                        status=JobStatus.GENERATING_VIDEO,
+                        message="Aplicando pós-processamento no vídeo (remoção de vinheta e marca d'água)...",
+                    )
+                    processed_video_path = await asyncio.to_thread(
+                        postprocess_native_video,
+                        video_path=Path(saved_video_path),
+                        logo_path=settings.native_video_logo_path,
+                        trim_seconds=settings.native_video_trim_seconds,
+                    )
+                    video_size = Path(processed_video_path).stat().st_size if Path(processed_video_path).exists() else 0
 
                     if job.cleanup_notebook and notebook_id:
                         try:
@@ -178,7 +191,7 @@ async def process_podcast_job(
                         job_id=job.id,
                         status=JobStatus.COMPLETED,
                         message="Podcast e vídeo nativo concluídos com sucesso.",
-                        video_file_path=str(saved_video_path),
+                        video_file_path=str(processed_video_path),
                         video_file_name=f"{job.id}.mp4",
                         video_size_bytes=video_size,
                     )
