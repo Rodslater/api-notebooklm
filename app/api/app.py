@@ -19,6 +19,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Inicialização e encerramento dos recursos da aplicação."""
     logger.info("Iniciando API NotebookLM v%s...", __version__)
 
+    if not settings.api_token.strip() and not settings.api_tokens.strip():
+        logger.critical(
+            "API_TOKEN e API_TOKENS não configurados: a API vai recusar todas as "
+            "requisições. Defina API_TOKEN no .env antes de usar em produção."
+        )
+
     # Garante estrutura de pastas
     settings.storage_dir.mkdir(parents=True, exist_ok=True)
     (settings.storage_dir / "uploads").mkdir(parents=True, exist_ok=True)
@@ -50,7 +56,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

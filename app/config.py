@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Configurações da aplicação carregadas de variáveis de ambiente."""
 
-    api_token: str = "dev_token_notebooklm_2026"
+    api_token: str = ""
     api_tokens: str = ""
     port: int = 8000
     host: str = "0.0.0.0"

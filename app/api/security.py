@@ -1,11 +1,14 @@
 from dataclasses import dataclass
 import hashlib
+import logging
 import secrets
 
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer(auto_error=False)
 
@@ -54,7 +57,15 @@ async def verify_api_token(
     """Valida o Bearer token contra os tokens configurados na aplicação."""
     allowed = _load_allowed_tokens()
     if not allowed:
-        return AuthenticatedClient(client_id="admin", is_admin=True)
+        logger.critical(
+            "Nenhum API_TOKEN configurado: todas as requisições serão recusadas até que "
+            "API_TOKEN ou API_TOKENS seja definido no .env."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API sem token configurado. Defina API_TOKEN no .env do servidor.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     if not credentials or not credentials.credentials:
         raise HTTPException(
