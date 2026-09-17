@@ -47,8 +47,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     """Fábrica da aplicação FastAPI."""
     app = FastAPI(
-        title="API NotebookLM Podcast",
-        description="API HTTP para geração automatizada de podcasts em áudio a partir de textos e arquivos no Google NotebookLM.",
+        title="API de Podcasts",
+        description="API HTTP para geração automatizada de podcasts em áudio a partir de textos e arquivos.",
         version=__version__,
         lifespan=lifespan,
     )
