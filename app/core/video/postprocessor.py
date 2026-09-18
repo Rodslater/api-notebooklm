@@ -77,12 +77,20 @@ def postprocess_native_video(
     new_duration = max(1.0, total_duration - trim_seconds) if total_duration > (trim_seconds + 2.0) else None
 
     resolved_logo: Path | None = None
-    if logo_path and Path(logo_path).exists():
-        resolved_logo = Path(logo_path)
+    if logo_path:
+        p_logo = Path(logo_path)
+        if p_logo.exists():
+            resolved_logo = p_logo
+        else:
+            logger.warning("Arquivo de logo %s não encontrado para pós-processamento.", logo_path)
 
     resolved_outro: Path | None = None
-    if outro_path and Path(outro_path).exists():
-        resolved_outro = Path(outro_path)
+    if outro_path:
+        p_outro = Path(outro_path)
+        if p_outro.exists():
+            resolved_outro = p_outro
+        else:
+            logger.warning("Arquivo de encerramento %s não encontrado para pós-processamento.", outro_path)
 
     temp_output = video_path.parent / f"processed_{video_path.name}"
 
