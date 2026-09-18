@@ -136,3 +136,54 @@ def test_postprocess_native_video_with_real_brasirc_outro(tmp_path: Path):
     assert processed.exists()
     dur_after = get_video_duration(processed)
     assert 12.5 <= dur_after <= 13.5
+
+
+def test_postprocess_native_video_ignores_outro_on_vertical_clip(tmp_path: Path):
+    ffmpeg_exe = get_ffmpeg_path()
+    clip_path = tmp_path / "synthetic_vertical.mp4"
+    outro_path = tmp_path / "synthetic_outro.mp4"
+
+    import subprocess
+    # Gera clipe vertical (240x320 - altura maior que largura) de 6.0 segundos
+    cmd_main = [
+        ffmpeg_exe,
+        "-y",
+        "-f", "lavfi",
+        "-i", "color=c=blue:s=240x320:d=6.0",
+        "-f", "lavfi",
+        "-i", "anullsrc=r=44100:cl=mono",
+        "-t", "6.0",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-c:a", "aac",
+        str(clip_path),
+    ]
+    subprocess.run(cmd_main, check=True, capture_output=True)
+
+    # Gera clipe de encerramento horizontal de 3.0 segundos
+    cmd_outro = [
+        ffmpeg_exe,
+        "-y",
+        "-f", "lavfi",
+        "-i", "color=c=red:s=320x240:d=3.0",
+        "-f", "lavfi",
+        "-i", "anullsrc=r=44100:cl=mono",
+        "-t", "3.0",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-c:a", "aac",
+        str(outro_path),
+    ]
+    subprocess.run(cmd_outro, check=True, capture_output=True)
+
+    # Em vídeo vertical, o encerramento horizontal DEVE ser ignorado: duração esperada 6.0 - 3.1 = 2.9s
+    processed = postprocess_native_video(
+        video_path=clip_path,
+        logo_path=None,
+        trim_seconds=3.1,
+        outro_path=outro_path,
+    )
+
+    assert processed.exists()
+    dur_after = get_video_duration(processed)
+    assert 2.7 <= dur_after <= 3.1

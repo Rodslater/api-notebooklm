@@ -92,6 +92,15 @@ def postprocess_native_video(
         else:
             logger.warning("Arquivo de encerramento %s não encontrado para pós-processamento.", outro_path)
 
+    # Não anexa vinheta horizontal em vídeos verticais (shorts 9:16)
+    if resolved_outro and main_info["height"] > main_info["width"]:
+        logger.info(
+            "Vídeo vertical detectado (%sx%s). Vinheta de encerramento horizontal não será anexada.",
+            main_info["width"],
+            main_info["height"],
+        )
+        resolved_outro = None
+
     temp_output = video_path.parent / f"processed_{video_path.name}"
 
     if resolved_outro:

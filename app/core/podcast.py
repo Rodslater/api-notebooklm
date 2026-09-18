@@ -5,7 +5,7 @@ from pathlib import Path
 from app.config import settings
 from app.core.client import get_notebooklm_client
 from app.core.jobs import job_manager
-from app.core.models import JobStatus, PodcastJob, VideoEngine
+from app.core.models import JobStatus, PodcastJob, VideoEngine, VideoFormat
 from app.core.notifier import notify_webhook
 from app.core.sanitizer import sanitize_error_message
 from app.core.video import generate_podcast_video
@@ -172,12 +172,18 @@ async def process_podcast_job(
                         status=JobStatus.GENERATING_VIDEO,
                         message="Aplicando pós-processamento no vídeo (remoção de vinheta, marca d'água e encerramento BrasIRC)...",
                     )
+                    # A vinheta de encerramento da BrasIRC aplica-se apenas ao vídeo horizontal (deep dive), nunca ao short
+                    outro_to_use = (
+                        None
+                        if job.video_format == VideoFormat.SHORT
+                        else settings.native_video_outro_path
+                    )
                     processed_video_path = await asyncio.to_thread(
                         postprocess_native_video,
                         video_path=Path(saved_video_path),
                         logo_path=settings.native_video_logo_path,
                         trim_seconds=settings.native_video_trim_seconds,
-                        outro_path=settings.native_video_outro_path,
+                        outro_path=outro_to_use,
                     )
                     video_size = Path(processed_video_path).stat().st_size if Path(processed_video_path).exists() else 0
 
