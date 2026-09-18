@@ -170,13 +170,14 @@ async def process_podcast_job(
                     await job_manager.update_job_status(
                         job_id=job.id,
                         status=JobStatus.GENERATING_VIDEO,
-                        message="Aplicando pós-processamento no vídeo (remoção de vinheta e marca d'água)...",
+                        message="Aplicando pós-processamento no vídeo (remoção de vinheta, marca d'água e encerramento BrasIRC)...",
                     )
                     processed_video_path = await asyncio.to_thread(
                         postprocess_native_video,
                         video_path=Path(saved_video_path),
                         logo_path=settings.native_video_logo_path,
                         trim_seconds=settings.native_video_trim_seconds,
+                        outro_path=settings.native_video_outro_path,
                     )
                     video_size = Path(processed_video_path).stat().st_size if Path(processed_video_path).exists() else 0
 

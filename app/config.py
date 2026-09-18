@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     default_video_style: str = "auto_select"
     native_video_trim_seconds: float = 3.1
     native_video_logo_path: Path = Path("./app/assets/logo_brasirc.png")
+    native_video_outro_path: Path = Path("./app/assets/brasirc_video_encerramento.mp4")
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.6-flash"
     pexels_api_key: str = ""

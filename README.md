@@ -151,9 +151,10 @@ Ao ativar `generate_video: true`, você pode escolher entre o vídeo oficial do 
   * `custom`: estilo personalizado guiado pelo texto fornecido em `video_style_prompt`.
 
 * **Pós-processamento Automático do Vídeo Nativo:**
-  Ao gerar com o motor `notebooklm`, a API aplica automaticamente duas etapas de acabamento via FFmpeg antes de disponibilizar o arquivo para download:
+  Ao gerar com o motor `notebooklm`, a API aplica automaticamente três etapas de acabamento via FFmpeg antes de disponibilizar o arquivo para download:
   1. **Remoção da Vinheta Promocional Final:** Os últimos 3.1 segundos (tela cheia com animação de encerramento do Google) são cortados de forma limpa, encerrando o vídeo exatamente na cena final do conteúdo.
-  2. **Sobreposição da Logo:** A logo configurada em `NATIVE_VIDEO_LOGO_PATH` (por padrão `app/assets/logo_brasirc.png`) é posicionada rente ao canto inferior direito, cobrindo integralmente a marca "Gemini Notebook" tanto em proporção vertical (9:16) quanto horizontal (16:9).
+  2. **Sobreposição da Logo:** A logo configurada em `NATIVE_VIDEO_LOGO_PATH` (por padrão `app/assets/logo_brasirc.png`) é posicionada rente ao canto inferior direito do vídeo principal, cobrindo integralmente a marca "Gemini Notebook" tanto em proporção vertical (9:16) quanto horizontal (16:9).
+  3. **Vinheta Oficial de Encerramento:** Concatena o vídeo de encerramento (`NATIVE_VIDEO_OUTRO_PATH`, por padrão `app/assets/brasirc_video_encerramento.mp4`) logo após o corte dos 3.1 segundos, ajustando escala, taxa de quadros e áudio para uma transição contínua.
 
 ---
 
@@ -383,6 +384,7 @@ CLEANUP_NOTEBOOK=true
 # Pós-processamento do vídeo nativo (NotebookLM)
 NATIVE_VIDEO_TRIM_SECONDS=3.1
 NATIVE_VIDEO_LOGO_PATH=/app/app/assets/logo_brasirc.png
+NATIVE_VIDEO_OUTRO_PATH=/app/app/assets/brasirc_video_encerramento.mp4
 
 # Esteira de vídeo sincronizado (IA e Pexels)
 GEMINI_API_KEY=sua_chave_gemini

@@ -9,8 +9,8 @@ from app.core.video.renderer import get_ffmpeg_path
 logger = logging.getLogger(__name__)
 
 
-def get_video_duration(video_path: Path) -> float:
-    """Extrai a duração exata do arquivo de vídeo em segundos via FFmpeg."""
+def get_video_info(video_path: Path) -> dict:
+    """Extrai metadados essenciais do vídeo (duração, resolução, taxa de quadros e áudio) via FFmpeg."""
     ffmpeg_exe = get_ffmpeg_path()
     res = subprocess.run(
         [ffmpeg_exe, "-i", str(video_path)],
@@ -19,40 +19,149 @@ def get_video_duration(video_path: Path) -> float:
         encoding="utf-8",
         errors="ignore",
     )
-    match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", res.stderr)
-    if not match:
-        logger.warning("Não foi possível identificar a duração do vídeo %s.", video_path)
-        return 0.0
 
-    hours, minutes, seconds = match.groups()
-    return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+    duration = 0.0
+    dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", res.stderr)
+    if dur_match:
+        hours, minutes, seconds = dur_match.groups()
+        duration = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+    else:
+        logger.warning("Não foi possível identificar a duração do vídeo %s.", video_path)
+
+    width, height = 1920, 1080
+    vid_match = re.search(r"Stream #\d+:\d+.*Video:.*?(\d{3,4})x(\d{3,4})", res.stderr)
+    if vid_match:
+        width, height = int(vid_match.group(1)), int(vid_match.group(2))
+
+    fps = 30.0
+    fps_match = re.search(r"(\d+(?:\.\d+)?)\s*fps", res.stderr)
+    if fps_match:
+        fps = float(fps_match.group(1))
+
+    has_audio = bool(re.search(r"Stream #\d+:\d+.*Audio:", res.stderr))
+
+    return {
+        "duration": duration,
+        "width": width,
+        "height": height,
+        "fps": fps,
+        "has_audio": has_audio,
+    }
+
+
+def get_video_duration(video_path: Path) -> float:
+    """Extrai a duração exata do arquivo de vídeo em segundos via FFmpeg."""
+    info = get_video_info(video_path)
+    return info["duration"]
 
 
 def postprocess_native_video(
     video_path: Path,
     logo_path: Path | None = None,
     trim_seconds: float = 3.1,
+    outro_path: Path | None = None,
 ) -> Path:
     """Aplica pós-processamento no vídeo nativo do NotebookLM.
 
     Remove a vinheta promocional final e sobrepõe a logo personalizada
-    sobre a inscrição Gemini Notebook no canto inferior direito.
+    sobre a inscrição Gemini Notebook no canto inferior direito do vídeo principal,
+    concatenando a vinheta de encerramento ao final.
     """
     if not video_path.exists():
         logger.warning("Arquivo de vídeo %s não encontrado para pós-processamento.", video_path)
         return video_path
 
     ffmpeg_exe = get_ffmpeg_path()
-    total_duration = get_video_duration(video_path)
+    main_info = get_video_info(video_path)
+    total_duration = main_info["duration"]
     new_duration = max(1.0, total_duration - trim_seconds) if total_duration > (trim_seconds + 2.0) else None
 
     resolved_logo: Path | None = None
     if logo_path and Path(logo_path).exists():
         resolved_logo = Path(logo_path)
 
+    resolved_outro: Path | None = None
+    if outro_path and Path(outro_path).exists():
+        resolved_outro = Path(outro_path)
+
     temp_output = video_path.parent / f"processed_{video_path.name}"
 
-    if resolved_logo:
+    if resolved_outro:
+        outro_info = get_video_info(resolved_outro)
+        width, height = main_info["width"], main_info["height"]
+        fps = main_info["fps"]
+
+        inputs = ["-i", str(video_path)]
+        logo_idx: int | None = None
+        outro_idx = 1
+
+        if resolved_logo:
+            inputs.extend(["-i", str(resolved_logo)])
+            logo_idx = 1
+            outro_idx = 2
+
+        inputs.extend(["-i", str(resolved_outro)])
+
+        filter_parts: list[str] = []
+
+        if new_duration is not None:
+            trim_v = f"trim=0:{new_duration:.3f},setpts=PTS-STARTPTS"
+            trim_a = f"atrim=0:{new_duration:.3f},asetpts=PTS-STARTPTS"
+        else:
+            trim_v = "setpts=PTS-STARTPTS"
+            trim_a = "asetpts=PTS-STARTPTS"
+
+        filter_parts.append(f"[0:v]{trim_v},fps={fps},setsar=1[v0_trimmed]")
+
+        if resolved_logo and logo_idx is not None:
+            logo_needs_scale = True
+            try:
+                with Image.open(resolved_logo) as img:
+                    if img.size[0] <= 250:
+                        logo_needs_scale = False
+            except Exception as e:
+                logger.warning("Não foi possível inspecionar dimensões da logo: %s", e)
+
+            if logo_needs_scale:
+                filter_parts.append(f"[{logo_idx}:v]scale=200:-2[logo_ready]")
+                filter_parts.append("[v0_trimmed][logo_ready]overlay=W-w-8:H-h-8[v0_ready]")
+            else:
+                filter_parts.append(f"[v0_trimmed][{logo_idx}:v]overlay=W-w-8:H-h-8[v0_ready]")
+        else:
+            filter_parts.append("[v0_trimmed]null[v0_ready]")
+
+        if main_info["has_audio"]:
+            filter_parts.append(f"[0:a]{trim_a},aformat=sample_rates=48000:channel_layouts=stereo[a0_ready]")
+        else:
+            silence_dur = new_duration if new_duration is not None else (total_duration if total_duration > 0 else 1.0)
+            filter_parts.append(f"aevalsrc=0:d={silence_dur:.3f},aformat=sample_rates=48000:channel_layouts=stereo[a0_ready]")
+
+        filter_parts.append(
+            f"[{outro_idx}:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps}[v1_ready]"
+        )
+
+        if outro_info["has_audio"]:
+            filter_parts.append(f"[{outro_idx}:a]aformat=sample_rates=48000:channel_layouts=stereo[a1_ready]")
+        else:
+            filter_parts.append(f"aevalsrc=0:d={outro_info['duration']:.3f},aformat=sample_rates=48000:channel_layouts=stereo[a1_ready]")
+
+        filter_parts.append("[v0_ready][a0_ready][v1_ready][a1_ready]concat=n=2:v=1:a=1[outv][outa]")
+
+        cmd = [
+            ffmpeg_exe,
+            "-y",
+            *inputs,
+            "-filter_complex", ";".join(filter_parts),
+            "-map", "[outv]",
+            "-map", "[outa]",
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "18",
+            "-c:a", "aac",
+            str(temp_output),
+        ]
+    elif resolved_logo:
         filtro_logo = "[1:v]scale=200:-2[logo];[0:v][logo]overlay=W-w-8:H-h-8"
         try:
             with Image.open(resolved_logo) as img:
